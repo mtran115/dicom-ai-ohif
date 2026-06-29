@@ -201,36 +201,36 @@ const Thumbnail = ({
     return (
       <div
         className={classnames(
-          'flex h-full w-full items-center justify-between pr-[8px] pl-[8px] pt-[4px] pb-[4px]',
+          'flex h-full w-full items-center justify-between pr-[4px] pl-[5px] pt-[2px] pb-[2px]',
           isActive && 'bg-popover rounded'
         )}
       >
-        <div className="relative flex h-[32px] items-center gap-[8px]">
+        <div className="relative flex h-[28px] min-w-0 items-center gap-[5px]">
           <div
             className={classnames(
-              'h-[32px] w-[4px] rounded-[2px]',
+              'h-[26px] w-[3px] flex-shrink-0 rounded-[2px]',
               isActive || isHydratedForDerivedDisplaySet ? 'bg-highlight' : 'bg-primary/65',
               loadingProgress && loadingProgress < 1 && 'bg-primary/25'
             )}
           ></div>
-          <div className="flex h-full flex-col">
-            <div className="flex items-center gap-[7px]">
-              <div className="text-[13px] font-semibold text-white">{modality}</div>
+          <div className="flex h-full min-w-0 flex-col">
+            <div className="flex min-w-0 items-center gap-[5px]">
+              <div className="flex-shrink-0 text-[10px] font-semibold leading-[12px] text-white">{modality}</div>
 
-              <div className="max-w-[160px] overflow-hidden overflow-ellipsis whitespace-nowrap text-[13px] font-normal text-white">
+              <div className="max-w-[128px] overflow-hidden overflow-ellipsis whitespace-nowrap text-[10px] font-normal leading-[12px] text-white">
                 {description}
               </div>
             </div>
 
-            <div className="flex h-[12px] items-center gap-[7px] overflow-hidden">
-              <div className="text-muted-foreground text-[12px]"> S:{seriesNumber}</div>
-              <div className="text-muted-foreground text-[12px]">
-                <div className="flex items-center gap-[4px]">
+            <div className="flex h-[11px] items-center gap-[5px] overflow-hidden">
+              <div className="text-muted-foreground text-[9px] leading-[11px]">S:{seriesNumber}</div>
+              <div className="text-muted-foreground text-[9px] leading-[11px]">
+                <div className="flex items-center gap-[3px]">
                   {' '}
                   {countIcon ? (
-                    React.createElement(Icons[countIcon] || Icons.MissingIcon, { className: 'w-3' })
+                    React.createElement(Icons[countIcon] || Icons.MissingIcon, { className: 'w-2.5' })
                   ) : (
-                    <Icons.InfoSeries className="w-3" />
+                    <Icons.InfoSeries className="w-2.5" />
                   )}
                   <div>{numInstances}</div>
                 </div>
@@ -238,7 +238,7 @@ const Thumbnail = ({
             </div>
           </div>
         </div>
-        <div className="flex h-full items-center gap-[4px]">
+        <div className="flex h-full flex-shrink-0 items-center gap-[2px]">
           <DisplaySetMessageListTooltip
             messages={messages}
             id={`display-set-tooltip-${displaySetInstanceUID}`}
@@ -317,7 +317,7 @@ const Thumbnail = ({
         className,
         'bg-muted hover:bg-primary/30 group flex cursor-pointer select-none flex-col rounded outline-none',
         viewPreset === 'thumbnails' && 'h-[170px] w-[135px]',
-        viewPreset === 'list' && 'h-[40px] w-[275px]'
+        viewPreset === 'list' && 'h-[32px] w-[199px]'
       )}
       id={`thumbnail-${displaySetInstanceUID}`}
       data-cy={

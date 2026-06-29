@@ -4,12 +4,12 @@ const defaultViewPresets = [
   {
     id: 'list',
     iconName: 'ListView',
-    selected: false,
+    selected: true,
   },
   {
     id: 'thumbnails',
     iconName: 'ThumbnailView',
-    selected: true,
+    selected: false,
   },
 ] as viewPreset[];
 

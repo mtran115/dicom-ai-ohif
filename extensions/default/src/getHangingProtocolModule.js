@@ -2,6 +2,7 @@ import hpMNGrid from './hangingprotocols/hpMNGrid';
 import hpMNCompare from './hangingprotocols/hpCompare';
 import hpMammography from './hangingprotocols/hpMammo';
 import hpScale from './hangingprotocols/hpScale';
+import dicomAiLumbarSpineMR from './hangingprotocols/dicomAiLumbarSpineMR';
 
 const defaultProtocol = {
   id: 'default',
@@ -126,6 +127,10 @@ function getHangingProtocolModule() {
     {
       name: defaultProtocol.id,
       protocol: defaultProtocol,
+    },
+    {
+      name: dicomAiLumbarSpineMR.id,
+      protocol: dicomAiLumbarSpineMR,
     },
     // Create a MxN comparison hanging protocol available by default
     {

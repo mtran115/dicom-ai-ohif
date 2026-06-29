@@ -16,6 +16,8 @@ const { getSplitParam } = utils;
 const WORKBENCH_HOTKEY_MESSAGE = 'dicom-ai-workbench-hotkey';
 const WORKBENCH_TOOL_SHORTCUTS = {
   a: 'ArrowAnnotate',
+  p: 'Pan',
+  w: 'WindowLevel',
   z: 'Zoom',
 };
 

@@ -6,6 +6,7 @@ import {
   getOrCreateCanvas,
   StackViewport,
   BaseVolumeViewport,
+  metaData,
 } from '@cornerstonejs/core';
 import { ToolGroupManager } from '@cornerstonejs/tools';
 import { ViewportDownloadForm } from '@ohif/ui';
@@ -17,10 +18,197 @@ const DEFAULT_SIZE = 512;
 const MAX_TEXTURE_SIZE = 10000;
 const VIEWPORT_ID = 'cornerstone-viewport-download-form';
 
+const WORKBENCH_CAPTURE_SOURCE = 'ohif-native-camera';
+
+function getWorkbenchConfig() {
+  return (window as any).config?.dicomAiWorkbench ?? {};
+}
+
+function isWorkbenchCaptureEnabled() {
+  return getWorkbenchConfig()?.keyImageCapture?.enabled !== false;
+}
+
+function getWorkbenchApiBaseUrl() {
+  const configuredUrl = getWorkbenchConfig()?.apiBaseUrl;
+  return typeof configuredUrl === 'string' && configuredUrl.length
+    ? configuredUrl.replace(/\/$/, '')
+    : window.location.origin;
+}
+
+function getStudyInstanceUid() {
+  const params = new URLSearchParams(window.location.search);
+  return (
+    params.get('StudyInstanceUIDs') ||
+    params.get('studyInstanceUID') ||
+    params.get('StudyInstanceUID')
+  );
+}
+
+function getFileTypeValue(fileType) {
+  return Array.isArray(fileType) ? fileType[0] : fileType;
+}
+
+function getImageMimeType(fileType) {
+  const fileTypeValue = getFileTypeValue(fileType);
+  return fileTypeValue === 'jpg' ? 'image/jpeg' : `image/${fileTypeValue}`;
+}
+
+function getActiveDisplaySet(displaySetService, cornerstoneViewportService, viewportId) {
+  const viewportInfo = cornerstoneViewportService.getViewportInfo(viewportId);
+  const viewportData = viewportInfo?.getViewportData?.();
+  const viewportDataItems = Array.isArray(viewportData?.data)
+    ? viewportData.data
+    : [viewportData?.data];
+  const displaySetInstanceUID = viewportDataItems.find(Boolean)?.displaySetInstanceUID;
+
+  return displaySetInstanceUID
+    ? displaySetService?.getDisplaySetByUID(displaySetInstanceUID)
+    : null;
+}
+
+function getNumberValue(value) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : value;
+}
+
+function getCaptureMetadata({
+  activeViewport,
+  activeViewportId,
+  cornerstoneViewportService,
+  displaySetService,
+}) {
+  const displaySet = getActiveDisplaySet(
+    displaySetService,
+    cornerstoneViewportService,
+    activeViewportId
+  );
+  const imageId = activeViewport.getCurrentImageId?.();
+  const imageIndex = getNumberValue(activeViewport.getCurrentImageIdIndex?.());
+  const numberOfSlices = getNumberValue(activeViewport.getNumberOfSlices?.());
+  const generalImageModule = imageId ? metaData.get('generalImageModule', imageId) || {} : {};
+  const instanceNumber = getNumberValue(generalImageModule.instanceNumber);
+
+  return {
+    series_number: getNumberValue(displaySet?.SeriesNumber ?? displaySet?.seriesNumber),
+    series_description: displaySet?.SeriesDescription ?? displaySet?.seriesDescription ?? null,
+    instance_number: instanceNumber,
+    image_index:
+      typeof imageIndex === 'number'
+        ? imageIndex + 1
+        : imageIndex,
+    number_of_slices: numberOfSlices,
+  };
+}
+
+function formatSeriesLabel(metadata) {
+  const { series_number: seriesNumber, series_description: seriesDescription } = metadata;
+  const labelParts = [];
+
+  if (seriesNumber !== null && seriesNumber !== undefined) {
+    labelParts.push(`S:${seriesNumber}`);
+  }
+
+  if (seriesDescription) {
+    labelParts.push(seriesDescription);
+  }
+
+  return labelParts.join(' ');
+}
+
+function formatImageLabel(metadata) {
+  const {
+    instance_number: instanceNumber,
+    image_index: imageIndex,
+    number_of_slices: numberOfSlices,
+  } = metadata;
+
+  const imagePosition =
+    imageIndex !== null &&
+    imageIndex !== undefined &&
+    numberOfSlices !== null &&
+    numberOfSlices !== undefined
+      ? `(${imageIndex}/${numberOfSlices})`
+      : null;
+
+  if (instanceNumber !== null && instanceNumber !== undefined) {
+    return imagePosition ? `I:${instanceNumber} ${imagePosition}` : `I:${instanceNumber}`;
+  }
+
+  return imagePosition || '';
+}
+
+function truncateText(ctx, text, maxWidth) {
+  if (!text || ctx.measureText(text).width <= maxWidth) {
+    return text;
+  }
+
+  const ellipsis = '...';
+  let truncated = text;
+
+  while (truncated.length > 0 && ctx.measureText(`${truncated}${ellipsis}`).width > maxWidth) {
+    truncated = truncated.slice(0, -1);
+  }
+
+  return `${truncated}${ellipsis}`;
+}
+
+function addMetadataFooter(canvas, metadata) {
+  const seriesLabel = formatSeriesLabel(metadata);
+  const imageLabel = formatImageLabel(metadata);
+
+  if (!seriesLabel && !imageLabel) {
+    return canvas;
+  }
+
+  const footerCanvas = document.createElement('canvas');
+  footerCanvas.width = canvas.width;
+  footerCanvas.height = canvas.height;
+
+  const ctx = footerCanvas.getContext('2d');
+  if (!ctx) {
+    return canvas;
+  }
+
+  ctx.drawImage(canvas, 0, 0);
+
+  const scale = Math.max(1, canvas.width / 1024);
+  const fontSize = Math.round(18 * scale);
+  const padding = Math.round(12 * scale);
+  const footerHeight = fontSize + padding * 2;
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+  ctx.fillRect(0, canvas.height - footerHeight, canvas.width, footerHeight);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+  ctx.font = `600 ${fontSize}px Arial, sans-serif`;
+  ctx.textBaseline = 'middle';
+
+  const y = canvas.height - footerHeight / 2;
+  const rightWidth = imageLabel ? ctx.measureText(imageLabel).width : 0;
+  const leftMaxWidth = Math.max(0, canvas.width - padding * 3 - rightWidth);
+
+  if (seriesLabel) {
+    ctx.textAlign = 'left';
+    ctx.fillText(truncateText(ctx, seriesLabel, leftMaxWidth), padding, y);
+  }
+
+  if (imageLabel) {
+    ctx.textAlign = 'right';
+    ctx.fillText(imageLabel, canvas.width - padding, y);
+  }
+
+  return footerCanvas;
+}
+
 const CornerstoneViewportDownloadForm = ({
   onClose,
   activeViewportId: activeViewportIdProp,
   cornerstoneViewportService,
+  displaySetService,
+  uiNotificationService,
 }: withAppTypes) => {
   const enabledElement = OHIFgetEnabledElement(activeViewportIdProp);
   const activeViewportElement = enabledElement?.element;
@@ -214,17 +402,109 @@ const CornerstoneViewportDownloadForm = ({
     });
   };
 
+  const downloadCanvas = (canvas, filename, fileType) => {
+    const fileTypeValue = getFileTypeValue(fileType);
+    const file = `${filename}.${fileTypeValue}`;
+    const link = document.createElement('a');
+    link.download = file;
+    link.href = canvas.toDataURL(getImageMimeType(fileType), 1.0);
+    link.click();
+  };
+
+  const uploadCanvasToWorkbench = (canvas, filename, fileType, captureMetadata) =>
+    new Promise<void>((resolve, reject) => {
+      const studyInstanceUid = getStudyInstanceUid();
+      if (!studyInstanceUid) {
+        reject(new Error('No StudyInstanceUIDs parameter was found for this viewer session.'));
+        return;
+      }
+
+      canvas.toBlob(
+        async blob => {
+          if (!blob) {
+            reject(new Error('Unable to render the key image screenshot.'));
+            return;
+          }
+
+          try {
+            const formData = new FormData();
+            const fileTypeValue = getFileTypeValue(fileType);
+            formData.append('file', blob, `${filename}.${fileTypeValue}`);
+            formData.append(
+              'source_json',
+              JSON.stringify({
+                source: WORKBENCH_CAPTURE_SOURCE,
+                file_type: fileTypeValue,
+                filename,
+                viewport_id: activeViewportId,
+                ...captureMetadata,
+                captured_at: new Date().toISOString(),
+                viewer_url: window.location.href,
+              })
+            );
+
+            const response = await fetch(
+              `${getWorkbenchApiBaseUrl()}/studies/by-uid/${encodeURIComponent(
+                studyInstanceUid
+              )}/key-image-screenshots`,
+              {
+                method: 'POST',
+                body: formData,
+              }
+            );
+
+            if (!response.ok) {
+              throw new Error(`Workbench returned ${response.status}`);
+            }
+
+            window.parent?.postMessage(
+              { type: 'dicom-ai:key-image-saved', studyInstanceUid },
+              '*'
+            );
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        },
+        getImageMimeType(fileType),
+        1.0
+      );
+    });
+
   const downloadBlob = (filename, fileType) => {
-    const file = `${filename}.${fileType}`;
     const divForDownloadViewport = document.querySelector(
       `div[data-viewport-uid="${VIEWPORT_ID}"]`
     );
 
-    html2canvas(divForDownloadViewport).then(canvas => {
-      const link = document.createElement('a');
-      link.download = file;
-      link.href = canvas.toDataURL(fileType, 1.0);
-      link.click();
+    html2canvas(divForDownloadViewport).then(async canvas => {
+      const captureMetadata = getCaptureMetadata({
+        activeViewport,
+        activeViewportId,
+        cornerstoneViewportService,
+        displaySetService,
+      });
+      const canvasWithFooter = addMetadataFooter(canvas, captureMetadata);
+
+      if (!isWorkbenchCaptureEnabled()) {
+        downloadCanvas(canvasWithFooter, filename, fileType);
+        return;
+      }
+
+      try {
+        await uploadCanvasToWorkbench(canvasWithFooter, filename, fileType, captureMetadata);
+        uiNotificationService?.show({
+          title: 'Key image saved',
+          message: 'Annotated screenshot saved to Workbench.',
+          type: 'success',
+        });
+        onClose?.();
+      } catch (error) {
+        uiNotificationService?.show({
+          title: 'Key image not saved',
+          message: error instanceof Error ? error.message : 'Unable to save key image.',
+          type: 'error',
+        });
+      }
     });
   };
 
@@ -240,6 +520,7 @@ const CornerstoneViewportDownloadForm = ({
       updateViewportPreview={updateViewportPreview}
       loadImage={loadImage}
       toggleAnnotations={toggleAnnotations}
+      submitLabel={isWorkbenchCaptureEnabled() ? 'Save to Workbench' : 'Download'}
       downloadBlob={downloadBlob}
     />
   );

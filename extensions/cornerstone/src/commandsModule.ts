@@ -35,6 +35,10 @@ const toggleSyncFunctions = {
   voi: toggleVOISliceSync,
 };
 
+function isDicomAiWorkbenchCaptureEnabled() {
+  return (window as any).config?.dicomAiWorkbench?.keyImageCapture?.enabled !== false;
+}
+
 function commandsModule({
   servicesManager,
   extensionManager,
@@ -48,6 +52,7 @@ function commandsModule({
     cornerstoneViewportService,
     uiNotificationService,
     measurementService,
+    displaySetService,
     customizationService,
     colorbarService,
     hangingProtocolService,
@@ -455,13 +460,16 @@ function commandsModule({
       const { uiModalService } = servicesManager.services;
 
       if (uiModalService) {
+        const captureEnabled = isDicomAiWorkbenchCaptureEnabled();
         uiModalService.show({
           content: CornerstoneViewportDownloadForm,
-          title: 'Download High Quality Image',
+          title: captureEnabled ? 'Save Key Image to Workbench' : 'Download High Quality Image',
           contentProps: {
             activeViewportId,
             onClose: uiModalService.hide,
             cornerstoneViewportService,
+            displaySetService,
+            uiNotificationService,
           },
           containerDimensions: 'w-[70%] max-w-[900px]',
         });

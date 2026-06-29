@@ -38,6 +38,7 @@ const ViewportDownloadForm = ({
   minimumSize,
   maximumSize,
   canvasClass,
+  submitLabel = 'Download',
 }) => {
   const { t } = useTranslation('Modals');
 
@@ -400,7 +401,7 @@ const ViewportDownloadForm = ({
           type={ButtonEnums.type.primary}
           name={'download'}
         >
-          {t('Download')}
+          {t(submitLabel)}
         </Button>
       </div>
     </div>

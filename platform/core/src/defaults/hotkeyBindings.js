@@ -12,6 +12,13 @@ const bindings = [
     isEditable: true,
   },
   {
+    commandName: 'setToolActive',
+    commandOptions: { toolName: 'ArrowAnnotate' },
+    label: 'Arrow Annotate',
+    keys: ['a'],
+    isEditable: true,
+  },
+  {
     commandName: 'scaleUpViewport',
     label: 'Zoom In',
     keys: ['+'],

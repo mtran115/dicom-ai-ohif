@@ -13,6 +13,24 @@ import { defaultRouteInit } from './defaultRouteInit';
 import { updateAuthServiceAndCleanUrl } from './updateAuthServiceAndCleanUrl';
 
 const { getSplitParam } = utils;
+const WORKBENCH_HOTKEY_MESSAGE = 'dicom-ai-workbench-hotkey';
+const WORKBENCH_TOOL_SHORTCUTS = {
+  a: 'ArrowAnnotate',
+  z: 'Zoom',
+};
+
+function getWorkbenchShortcutTool(key) {
+  return WORKBENCH_TOOL_SHORTCUTS[String(key || '').toLowerCase()];
+}
+
+function isEditableShortcutTarget(target) {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  return Boolean(
+    target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]')
+  );
+}
 
 export default function ModeRoute({
   mode,
@@ -186,6 +204,56 @@ export default function ModeRoute({
       hotkeysManager.destroy();
     };
   }, [ExtensionDependenciesLoaded, hotkeys, studyInstanceUIDs]);
+
+  useEffect(() => {
+    if (!ExtensionDependenciesLoaded || !studyInstanceUIDs?.length) {
+      return;
+    }
+
+    const activateToolForKey = key => {
+      const toolName = getWorkbenchShortcutTool(key);
+      if (!toolName) {
+        return false;
+      }
+
+      hotkeysManager.enable?.();
+      commandsManager.runCommand('setToolActive', { toolName });
+      return true;
+    };
+
+    const handleKeyDown = event => {
+      if (
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        isEditableShortcutTarget(event.target) ||
+        !getWorkbenchShortcutTool(event.key)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      activateToolForKey(event.key);
+    };
+
+    const handleWorkbenchMessage = event => {
+      if (event.data?.type !== WORKBENCH_HOTKEY_MESSAGE) {
+        return;
+      }
+      activateToolForKey(event.data.key);
+      window.focus();
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('message', handleWorkbenchMessage);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('message', handleWorkbenchMessage);
+    };
+  }, [ExtensionDependenciesLoaded, studyInstanceUIDs, commandsManager, hotkeysManager]);
 
   useEffect(() => {
     if (!layoutTemplateData.current || !ExtensionDependenciesLoaded || !studyInstanceUIDs?.length) {

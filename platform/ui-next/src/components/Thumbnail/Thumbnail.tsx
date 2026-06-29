@@ -317,7 +317,7 @@ const Thumbnail = ({
         className,
         'bg-muted hover:bg-primary/30 group flex cursor-pointer select-none flex-col rounded outline-none',
         viewPreset === 'thumbnails' && 'h-[170px] w-[135px]',
-        viewPreset === 'list' && 'col-span-2 h-[40px] w-[275px]'
+        viewPreset === 'list' && 'h-[40px] w-[275px]'
       )}
       id={`thumbnail-${displaySetInstanceUID}`}
       data-cy={

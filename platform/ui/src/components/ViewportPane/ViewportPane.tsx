@@ -38,7 +38,11 @@ function ViewportPane({
 
   const focus = () => {
     if (dropElement) {
-      dropElement.focus();
+      try {
+        dropElement.focus({ preventScroll: true });
+      } catch {
+        dropElement.focus();
+      }
     }
   };
 
@@ -58,6 +62,8 @@ function ViewportPane({
       // onInteractionHandler...
       // https://reactjs.org/docs/events.html#mouse-events
       // https://stackoverflow.com/questions/8378243/catch-scrolling-event-on-overflowhidden-element
+      tabIndex={-1}
+      onMouseEnter={focus}
       onMouseDown={onInteractionHandler}
       onDoubleClick={onDoubleClick}
       onClick={onInteractionHandler}

@@ -35,6 +35,15 @@ function getWorkbenchApiBaseUrl() {
     : window.location.origin;
 }
 
+function getWorkbenchAccessToken() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('token') || window.sessionStorage?.getItem('dicomAiWorkbenchAccessToken');
+  } catch {
+    return null;
+  }
+}
+
 function getStudyInstanceUid() {
   const params = new URLSearchParams(window.location.search);
   return (
@@ -427,6 +436,7 @@ const CornerstoneViewportDownloadForm = ({
           }
 
           try {
+            const accessToken = getWorkbenchAccessToken();
             const formData = new FormData();
             const fileTypeValue = getFileTypeValue(fileType);
             formData.append('file', blob, `${filename}.${fileTypeValue}`);
@@ -449,6 +459,7 @@ const CornerstoneViewportDownloadForm = ({
               )}/key-image-screenshots`,
               {
                 method: 'POST',
+                headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
                 body: formData,
               }
             );

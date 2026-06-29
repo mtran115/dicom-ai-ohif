@@ -20,6 +20,11 @@ export function updateAuthServiceAndCleanUrl(
       Authorization: 'Bearer ' + token,
     }),
   });
+  try {
+    window.sessionStorage?.setItem('dicomAiWorkbenchAccessToken', token);
+  } catch {
+    // Browser storage can be unavailable in private or restricted contexts.
+  }
 
   // Create a URL object with the current location
   const urlObj = new URL(window.location.origin + window.location.pathname + location.search);

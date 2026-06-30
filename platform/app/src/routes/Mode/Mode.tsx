@@ -14,15 +14,16 @@ import { updateAuthServiceAndCleanUrl } from './updateAuthServiceAndCleanUrl';
 
 const { getSplitParam } = utils;
 const WORKBENCH_HOTKEY_MESSAGE = 'dicom-ai-workbench-hotkey';
-const WORKBENCH_TOOL_SHORTCUTS = {
-  a: 'ArrowAnnotate',
-  p: 'Pan',
-  w: 'WindowLevel',
-  z: 'Zoom',
+const WORKBENCH_SHORTCUTS = {
+  a: { commandName: 'setToolActive', commandOptions: { toolName: 'ArrowAnnotate' } },
+  p: { commandName: 'setToolActive', commandOptions: { toolName: 'Pan' } },
+  s: { commandName: 'saveViewportToWorkbench' },
+  w: { commandName: 'setToolActive', commandOptions: { toolName: 'WindowLevel' } },
+  z: { commandName: 'setToolActive', commandOptions: { toolName: 'Zoom' } },
 };
 
-function getWorkbenchShortcutTool(key) {
-  return WORKBENCH_TOOL_SHORTCUTS[String(key || '').toLowerCase()];
+function getWorkbenchShortcut(key) {
+  return WORKBENCH_SHORTCUTS[String(key || '').toLowerCase()];
 }
 
 function isEditableShortcutTarget(target) {
@@ -212,14 +213,14 @@ export default function ModeRoute({
       return;
     }
 
-    const activateToolForKey = key => {
-      const toolName = getWorkbenchShortcutTool(key);
-      if (!toolName) {
+    const runWorkbenchShortcut = key => {
+      const shortcut = getWorkbenchShortcut(key);
+      if (!shortcut) {
         return false;
       }
 
       hotkeysManager.enable?.();
-      commandsManager.runCommand('setToolActive', { toolName });
+      commandsManager.runCommand(shortcut.commandName, shortcut.commandOptions);
       return true;
     };
 
@@ -229,7 +230,7 @@ export default function ModeRoute({
         event.ctrlKey ||
         event.metaKey ||
         isEditableShortcutTarget(event.target) ||
-        !getWorkbenchShortcutTool(event.key)
+        !getWorkbenchShortcut(event.key)
       ) {
         return;
       }
@@ -237,14 +238,14 @@ export default function ModeRoute({
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation?.();
-      activateToolForKey(event.key);
+      runWorkbenchShortcut(event.key);
     };
 
     const handleWorkbenchMessage = event => {
       if (event.data?.type !== WORKBENCH_HOTKEY_MESSAGE) {
         return;
       }
-      activateToolForKey(event.data.key);
+      runWorkbenchShortcut(event.data.key);
       window.focus();
     };
 

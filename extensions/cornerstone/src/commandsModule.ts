@@ -23,7 +23,9 @@ import {
 } from '@ohif/extension-default';
 import { vec3, mat4 } from 'gl-matrix';
 
-import CornerstoneViewportDownloadForm from './utils/CornerstoneViewportDownloadForm';
+import CornerstoneViewportDownloadForm, {
+  saveActiveViewportToWorkbench,
+} from './utils/CornerstoneViewportDownloadForm';
 import toggleImageSliceSync from './utils/imageSliceSync/toggleImageSliceSync';
 import { getFirstAnnotationSelected } from './utils/measurementServiceMappings/utils/selection';
 import getActiveViewportEnabledElement from './utils/getActiveViewportEnabledElement';
@@ -474,6 +476,25 @@ function commandsModule({
           containerDimensions: 'w-[70%] max-w-[900px]',
         });
       }
+    },
+    saveViewportToWorkbench: () => {
+      const { activeViewportId } = viewportGridService.getState();
+
+      if (!cornerstoneViewportService.getCornerstoneViewport(activeViewportId)) {
+        uiNotificationService.show({
+          title: 'Key image not saved',
+          message: 'Image cannot be captured',
+          type: 'error',
+        });
+        return;
+      }
+
+      saveActiveViewportToWorkbench({
+        activeViewportId,
+        cornerstoneViewportService,
+        displaySetService,
+        uiNotificationService,
+      });
     },
     rotateViewport: ({ rotation }) => {
       const enabledElement = _getActiveViewportEnabledElement();
@@ -1274,6 +1295,9 @@ function commandsModule({
     },
     setToolEnabled: {
       commandFn: actions.setToolEnabled,
+    },
+    saveViewportToWorkbench: {
+      commandFn: actions.saveViewportToWorkbench,
     },
     rotateViewportCW: {
       commandFn: actions.rotateViewport,

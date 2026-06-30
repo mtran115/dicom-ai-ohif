@@ -212,6 +212,151 @@ function addMetadataFooter(canvas, metadata) {
   return footerCanvas;
 }
 
+function buildDefaultKeyImageFilename(metadata) {
+  const seriesNumber = metadata.series_number ?? 'series';
+  const imageNumber = metadata.instance_number ?? metadata.image_index ?? Date.now();
+
+  return `key-image-s${seriesNumber}-i${imageNumber}`;
+}
+
+function downloadCanvas(canvas, filename, fileType) {
+  const fileTypeValue = getFileTypeValue(fileType);
+  const file = `${filename}.${fileTypeValue}`;
+  const link = document.createElement('a');
+  link.download = file;
+  link.href = canvas.toDataURL(getImageMimeType(fileType), 1.0);
+  link.click();
+}
+
+const uploadCanvasToWorkbench = ({
+  canvas,
+  filename,
+  fileType,
+  captureMetadata,
+  activeViewportId,
+}) =>
+  new Promise<void>((resolve, reject) => {
+    const studyInstanceUid = getStudyInstanceUid();
+    if (!studyInstanceUid) {
+      reject(new Error('No StudyInstanceUIDs parameter was found for this viewer session.'));
+      return;
+    }
+
+    canvas.toBlob(
+      async blob => {
+        if (!blob) {
+          reject(new Error('Unable to render the key image screenshot.'));
+          return;
+        }
+
+        try {
+          const accessToken = getWorkbenchAccessToken();
+          const formData = new FormData();
+          const fileTypeValue = getFileTypeValue(fileType);
+          formData.append('file', blob, `${filename}.${fileTypeValue}`);
+          formData.append(
+            'source_json',
+            JSON.stringify({
+              source: WORKBENCH_CAPTURE_SOURCE,
+              file_type: fileTypeValue,
+              filename,
+              viewport_id: activeViewportId,
+              ...captureMetadata,
+              captured_at: new Date().toISOString(),
+              viewer_url: window.location.href,
+            })
+          );
+
+          const response = await fetch(
+            `${getWorkbenchApiBaseUrl()}/studies/by-uid/${encodeURIComponent(
+              studyInstanceUid
+            )}/key-image-screenshots`,
+            {
+              method: 'POST',
+              headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+              body: formData,
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`Workbench returned ${response.status}`);
+          }
+
+          window.parent?.postMessage(
+            { type: 'dicom-ai:key-image-saved', studyInstanceUid },
+            '*'
+          );
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      },
+      getImageMimeType(fileType),
+      1.0
+    );
+  });
+
+export async function saveActiveViewportToWorkbench({
+  activeViewportId: activeViewportIdProp,
+  cornerstoneViewportService,
+  displaySetService,
+  uiNotificationService,
+}: withAppTypes) {
+  const enabledElement = OHIFgetEnabledElement(activeViewportIdProp);
+  const activeViewportElement = enabledElement?.element;
+  const activeViewportEnabledElement = activeViewportElement
+    ? getEnabledElement(activeViewportElement)
+    : null;
+
+  if (!activeViewportElement || !activeViewportEnabledElement) {
+    uiNotificationService?.show({
+      title: 'Key image not saved',
+      message: 'No active viewport is available to capture.',
+      type: 'error',
+    });
+    return;
+  }
+
+  const { viewportId: activeViewportId, viewport: activeViewport } = activeViewportEnabledElement;
+  const fileType = 'png';
+  const captureMetadata = getCaptureMetadata({
+    activeViewport,
+    activeViewportId,
+    cornerstoneViewportService,
+    displaySetService,
+  });
+  const filename = buildDefaultKeyImageFilename(captureMetadata);
+
+  try {
+    const canvas = await html2canvas(activeViewportElement);
+    const canvasWithFooter = addMetadataFooter(canvas, captureMetadata);
+
+    if (!isWorkbenchCaptureEnabled()) {
+      downloadCanvas(canvasWithFooter, filename, fileType);
+      return;
+    }
+
+    await uploadCanvasToWorkbench({
+      canvas: canvasWithFooter,
+      filename,
+      fileType,
+      captureMetadata,
+      activeViewportId,
+    });
+    uiNotificationService?.show({
+      title: 'Key image saved',
+      message: 'Annotated screenshot saved to Workbench.',
+      type: 'success',
+    });
+  } catch (error) {
+    uiNotificationService?.show({
+      title: 'Key image not saved',
+      message: error instanceof Error ? error.message : 'Unable to save key image.',
+      type: 'error',
+    });
+  }
+}
+
 const CornerstoneViewportDownloadForm = ({
   onClose,
   activeViewportId: activeViewportIdProp,
@@ -411,77 +556,6 @@ const CornerstoneViewportDownloadForm = ({
     });
   };
 
-  const downloadCanvas = (canvas, filename, fileType) => {
-    const fileTypeValue = getFileTypeValue(fileType);
-    const file = `${filename}.${fileTypeValue}`;
-    const link = document.createElement('a');
-    link.download = file;
-    link.href = canvas.toDataURL(getImageMimeType(fileType), 1.0);
-    link.click();
-  };
-
-  const uploadCanvasToWorkbench = (canvas, filename, fileType, captureMetadata) =>
-    new Promise<void>((resolve, reject) => {
-      const studyInstanceUid = getStudyInstanceUid();
-      if (!studyInstanceUid) {
-        reject(new Error('No StudyInstanceUIDs parameter was found for this viewer session.'));
-        return;
-      }
-
-      canvas.toBlob(
-        async blob => {
-          if (!blob) {
-            reject(new Error('Unable to render the key image screenshot.'));
-            return;
-          }
-
-          try {
-            const accessToken = getWorkbenchAccessToken();
-            const formData = new FormData();
-            const fileTypeValue = getFileTypeValue(fileType);
-            formData.append('file', blob, `${filename}.${fileTypeValue}`);
-            formData.append(
-              'source_json',
-              JSON.stringify({
-                source: WORKBENCH_CAPTURE_SOURCE,
-                file_type: fileTypeValue,
-                filename,
-                viewport_id: activeViewportId,
-                ...captureMetadata,
-                captured_at: new Date().toISOString(),
-                viewer_url: window.location.href,
-              })
-            );
-
-            const response = await fetch(
-              `${getWorkbenchApiBaseUrl()}/studies/by-uid/${encodeURIComponent(
-                studyInstanceUid
-              )}/key-image-screenshots`,
-              {
-                method: 'POST',
-                headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-                body: formData,
-              }
-            );
-
-            if (!response.ok) {
-              throw new Error(`Workbench returned ${response.status}`);
-            }
-
-            window.parent?.postMessage(
-              { type: 'dicom-ai:key-image-saved', studyInstanceUid },
-              '*'
-            );
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        },
-        getImageMimeType(fileType),
-        1.0
-      );
-    });
-
   const downloadBlob = (filename, fileType) => {
     const divForDownloadViewport = document.querySelector(
       `div[data-viewport-uid="${VIEWPORT_ID}"]`
@@ -502,7 +576,13 @@ const CornerstoneViewportDownloadForm = ({
       }
 
       try {
-        await uploadCanvasToWorkbench(canvasWithFooter, filename, fileType, captureMetadata);
+        await uploadCanvasToWorkbench({
+          canvas: canvasWithFooter,
+          filename,
+          fileType,
+          captureMetadata,
+          activeViewportId,
+        });
         uiNotificationService?.show({
           title: 'Key image saved',
           message: 'Annotated screenshot saved to Workbench.',

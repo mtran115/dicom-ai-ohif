@@ -49,25 +49,8 @@ function initDefaultToolGroup(
       {
         toolName: toolNames.ArrowAnnotate,
         configuration: {
-          getTextCallback: (callback, eventDetails) => {
-            if (modeLabelConfig) {
-              callback(' ');
-            } else {
-              commandsManager.runCommand('arrowTextCallback', {
-                callback,
-                eventDetails,
-              });
-            }
-          },
-          changeTextCallback: (data, eventDetails, callback) => {
-            if (modeLabelConfig === undefined) {
-              commandsManager.runCommand('arrowTextCallback', {
-                callback,
-                data,
-                eventDetails,
-              });
-            }
-          },
+          getTextCallback: callback => callback(' '),
+          changeTextCallback: (_data, _eventDetails, callback) => callback(' '),
         },
       },
       { toolName: toolNames.Bidirectional },
@@ -212,25 +195,8 @@ function initMPRToolGroup(extensionManager, toolGroupService, commandsManager, m
       {
         toolName: toolNames.ArrowAnnotate,
         configuration: {
-          getTextCallback: (callback, eventDetails) => {
-            if (modeLabelConfig) {
-              callback('');
-            } else {
-              commandsManager.runCommand('arrowTextCallback', {
-                callback,
-                eventDetails,
-              });
-            }
-          },
-          changeTextCallback: (data, eventDetails, callback) => {
-            if (modeLabelConfig === undefined) {
-              commandsManager.runCommand('arrowTextCallback', {
-                callback,
-                data,
-                eventDetails,
-              });
-            }
-          },
+          getTextCallback: callback => callback(' '),
+          changeTextCallback: (_data, _eventDetails, callback) => callback(' '),
         },
       },
       { toolName: toolNames.Bidirectional },
